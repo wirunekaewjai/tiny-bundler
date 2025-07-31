@@ -11,6 +11,7 @@ import sharp from "sharp";
 
 export type BundlerConfig = {
   assetsDir: string;
+  autoReload: boolean;
   backendDir: string;
   backendLanguage?: "rust";
   bundleDir: string;
@@ -26,7 +27,9 @@ export function defineConfig(config: BundlerConfig) {
 
 const isProduction = process.env.NODE_ENV === "production";
 
+const command = process.argv[2] as "dev" | "bundle";
 const cwd = process.cwd();
+
 const { default: config }: { default: BundlerConfig; } = await import(path.join(cwd, "bundler.config.ts"));
 
 const assetsDir = config.assetsDir;
@@ -35,6 +38,8 @@ const bundleDir = config.bundleDir;
 const frontendDir = config.frontendDir;
 const templateDir = config.templateDir;
 const tempDir = config.tempDir;
+
+const isAutoReload = config.autoReload && command === "dev";
 
 const backendLanguage = config.backendLanguage;
 const frontendAlias = { find: config.frontendAlias, replacement: path.join(cwd, frontendDir) };
@@ -375,11 +380,24 @@ async function bundle() {
 
   rmSync(path.join(cwd, bundleDir, tempDir), { force: true, recursive: true });
 
+  const inlines: string[] = [];
+
+  if (isAutoReload) {
+    const codePath = path.join(__dirname, "inline-scripts/auto-reload.ts");
+    const code = await Bun.file(codePath).text();
+
+    inlines.push(`<script>${code}</script>`);
+  }
+
   for (const [name, html] of rawHTMLs) {
     let output = html;
 
     for (const [alias, filePath] of replacers) {
       output = output.replaceAll(alias, filePath);
+    }
+
+    if (inlines.length) {
+      output = output.replace("</head>", `${inlines.join("")}</head>`);
     }
 
     output = await prettier.format(output, prettierOptions);
@@ -418,43 +436,48 @@ async function bundle() {
 }
 
 async function dev() {
+  const autoReloadTopic = "auto_reload";
+
   let autoReloadRevision = 0;
   let autoReloadController = new AbortController();
+  let autoReloadServer: Bun.Server | undefined;
 
-  const autoReloadServer = Bun.serve({
-    hostname: "0.0.0.0",
-    port: 7999,
+  if (isAutoReload) {
+    autoReloadServer = Bun.serve({
+      hostname: "0.0.0.0",
+      port: 7999,
 
-    websocket: {
-      open: (ws) => {
-        // console.log("Client connected");
-        ws.subscribe("auto_reload");
+      websocket: {
+        open: (ws) => {
+          // console.log("Client connected");
+          ws.subscribe(autoReloadTopic);
+        },
+
+        message: (_ws, __message) => {
+          // console.log("Client sent message", message);
+        },
+
+        close: (ws) => {
+          // console.log("Client disconnected");
+          ws.unsubscribe(autoReloadTopic);
+        },
       },
 
-      message: (_ws, __message) => {
-        // console.log("Client sent message", message);
-      },
+      async fetch(req, server) {
+        const url = new URL(req.url);
 
-      close: (ws) => {
-        // console.log("Client disconnected");
-        ws.unsubscribe("auto_reload");
-      },
-    },
+        if (url.pathname === "/ws") {
+          const upgraded = server.upgrade(req);
 
-    async fetch(req, server) {
-      const url = new URL(req.url);
-
-      if (url.pathname === "/ws") {
-        const upgraded = server.upgrade(req);
-
-        if (!upgraded) {
-          return new Response("Upgrade failed", { status: 400 });
+          if (!upgraded) {
+            return new Response("Upgrade failed", { status: 400 });
+          }
         }
-      }
 
-      return new Response(null, { status: 404 });
-    },
-  });
+        return new Response(null, { status: 404 });
+      },
+    });
+  }
 
   async function ping() {
     const host = "localhost";
@@ -491,7 +514,7 @@ async function dev() {
 
     while (!signal.aborted) {
       if (await ping()) {
-        autoReloadServer?.publish("auto_reload", `${autoReloadRevision++}`);
+        autoReloadServer?.publish(autoReloadTopic, `${autoReloadRevision++}`);
         break;
       }
 
@@ -572,13 +595,13 @@ async function dev() {
           });
         }
 
-        await notify();
+        if (isAutoReload) {
+          await notify();
+        }
       }
     }
   }
 }
-
-const command = process.argv[2];
 
 if (command === "dev") {
   console.clear();
