@@ -10,15 +10,32 @@ import { aliasPlugin } from "rolldown/experimental";
 import sharp from "sharp";
 
 export type BundlerConfig = {
-  assetsDir: string;
-  autoReload: boolean;
-  backendDir: string;
-  backendLanguage?: "rust";
-  bundleDir: string;
-  frontendAlias: string;
-  frontendDir: string;
-  templateDir: string;
-  tempDir: string;
+  backend?: {
+    command: {
+      dev: string[];
+      preview: string[];
+    };
+
+    srcDir: string;
+  };
+
+  frontend: {
+    alias: string;
+    srcDir: string;
+
+    /** @description templates directory name inside srcDir */
+    templates: string;
+  };
+
+  bundle: {
+    outDir: string;
+
+    /** @description assets directory name inside outDir */
+    assets: string;
+
+    /** @description temporary directory name for cache purpose */
+    temp?: string;
+  };
 };
 
 export function defineConfig(config: BundlerConfig) {
@@ -32,17 +49,15 @@ const cwd = process.cwd();
 
 const { default: config }: { default: BundlerConfig; } = await import(path.join(cwd, "bundler.config.ts"));
 
-const assetsDir = config.assetsDir;
-const backendDir = config.backendDir;
-const bundleDir = config.bundleDir;
-const frontendDir = config.frontendDir;
-const templateDir = config.templateDir;
-const tempDir = config.tempDir;
+const assetsDir = config.bundle.assets;
+const backendSrcDir = config.backend?.srcDir;
+const bundleDir = config.bundle.outDir;
+const frontendSrcDir = config.frontend.srcDir;
+const tempDir = config.bundle.temp ?? "temp";
 
-const isAutoReload = config.autoReload && command === "dev";
+const isAutoReload = !!config.backend && command === "dev";
 
-const backendLanguage = config.backendLanguage;
-const frontendAlias = { find: config.frontendAlias, replacement: path.join(cwd, frontendDir) };
+const frontendAlias = { find: config.frontend.alias, replacement: path.join(cwd, frontendSrcDir) };
 
 const resourceRegex = new RegExp(`["'](${frontendAlias.find}/[^"'*]+)["']`, "g");
 
@@ -213,7 +228,7 @@ async function bundle() {
           name: "x:bundle",
           transform: {
             async handler(code, id) {
-              if (!id.includes(`/${frontendDir}/`)) {
+              if (!id.includes(`/${frontendSrcDir}/`)) {
                 return;
               }
 
@@ -311,11 +326,11 @@ async function bundle() {
 
   const replacers = new Map<string, string>();
 
-  for (const name of new Bun.Glob(`${templateDir}/**/*`).scanSync({ cwd: path.join(cwd, frontendDir) })) {
+  for (const name of new Bun.Glob(`${config.frontend.templates}/**/*`).scanSync({ cwd: path.join(cwd, frontendSrcDir) })) {
     const moduleExt = path.extname(name);
     const moduleTemp = path.join(cwd, bundleDir, tempDir, name.replace(moduleExt, `.${version}${moduleExt}`));
 
-    const modulePath = path.join(cwd, frontendDir, name);
+    const modulePath = path.join(cwd, frontendSrcDir, name);
     const moduleBuild = await Bun.build({
       entrypoints: [modulePath],
       packages: 'bundle',
@@ -542,7 +557,7 @@ async function dev() {
     await Bun.sleep(100);
 
     const nextFrontend = new Set([
-      ...generateHashes(frontendDir),
+      ...generateHashes(frontendSrcDir),
     ]);
 
     const isFrontendChanged = nextFrontend.symmetricDifference(previousFrontend).size > 0;
@@ -557,10 +572,10 @@ async function dev() {
       }
     }
 
-    if (backendLanguage) {
+    if (backendSrcDir) {
       const nextBackend = new Set([
         ...generateHashes(bundleDir),
-        ...generateHashes(backendDir),
+        ...generateHashes(backendSrcDir),
       ]);
 
       const isBackendChanged = nextBackend.symmetricDifference(previousBackend).size > 0;
@@ -582,15 +597,11 @@ async function dev() {
 
         console.log(color("cornflowerblue", "===== server start ====="));
 
-        if (backendLanguage === "rust") {
-          const cmd = ["cargo", "run"];
+        const command = config.backend?.command;
 
-          if (isProduction) {
-            cmd.push("--release");
-          }
-
+        if (command) {
           webServer = Bun.spawn({
-            cmd,
+            cmd: isProduction ? command.preview : command.dev,
             stdout: "inherit",
           });
         }
