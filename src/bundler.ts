@@ -12,6 +12,7 @@ import sharp from "sharp";
 export type BundlerConfig = {
   assetsDir: string;
   backendDir: string;
+  backendLanguage?: "rust";
   bundleDir: string;
   frontendAlias: string;
   frontendDir: string;
@@ -35,6 +36,7 @@ const frontendDir = config.frontendDir;
 const templateDir = config.templateDir;
 const tempDir = config.tempDir;
 
+const backendLanguage = config.backendLanguage;
 const frontendAlias = { find: config.frontendAlias, replacement: path.join(cwd, frontendDir) };
 
 const resourceRegex = new RegExp(`["'](${frontendAlias.find}/[^"'*]+)["']`, "g");
@@ -532,42 +534,46 @@ async function dev() {
       }
     }
 
-    const nextBackend = new Set([
-      ...generateHashes(bundleDir),
-      ...generateHashes(backendDir),
-    ]);
+    if (backendLanguage) {
+      const nextBackend = new Set([
+        ...generateHashes(bundleDir),
+        ...generateHashes(backendDir),
+      ]);
 
-    const isBackendChanged = nextBackend.symmetricDifference(previousBackend).size > 0;
+      const isBackendChanged = nextBackend.symmetricDifference(previousBackend).size > 0;
 
-    previousBackend = nextBackend;
+      previousBackend = nextBackend;
 
-    if (isFrontendChanged || isBackendChanged) {
-      autoReloadController?.abort();
+      if (isFrontendChanged || isBackendChanged) {
+        autoReloadController?.abort();
 
-      if (webServer) {
-        webServer.kill("SIGINT");
+        if (webServer) {
+          webServer.kill("SIGINT");
 
-        while (!webServer.killed) {
-          await Bun.sleep(10);
+          while (!webServer.killed) {
+            await Bun.sleep(10);
+          }
+
+          console.log(color("cornflowerblue", "===== server end ====="));
         }
 
-        console.log(color("cornflowerblue", "===== server end ====="));
+        console.log(color("cornflowerblue", "===== server start ====="));
+
+        if (backendLanguage === "rust") {
+          const cmd = ["cargo", "run"];
+
+          if (isProduction) {
+            cmd.push("--release");
+          }
+
+          webServer = Bun.spawn({
+            cmd,
+            stdout: "inherit",
+          });
+        }
+
+        await notify();
       }
-
-      console.log(color("cornflowerblue", "===== server start ====="));
-
-      const cmd = ["cargo", "run"];
-
-      if (isProduction) {
-        cmd.push("--release");
-      }
-
-      webServer = Bun.spawn({
-        cmd,
-        stdout: "inherit",
-      });
-
-      await notify();
     }
   }
 }
@@ -581,4 +587,8 @@ if (command === "dev") {
 
 else if (command === "bundle") {
   await bundle();
+}
+
+else {
+  console.log("no operation");
 }

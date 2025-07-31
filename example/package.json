@@ -1,0 +1,20 @@
+{
+  "name": "example",
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "build": "bun ./node_modules/@wirunekaewjai/tiny-bundler -- bundle",
+    "dev": "NODE_ENV=development bun ./node_modules/@wirunekaewjai/tiny-bundler -- dev",
+    "preview": "NODE_ENV=production bun ./node_modules/@wirunekaewjai/tiny-bundler -- dev"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@wirunekaewjai/tiny-bundler": "file://.."
+  },
+  "peerDependencies": {
+    "typescript": "5.8.3"
+  },
+  "dependencies": {
+    "lucide": "0.534.0"
+  }
+}
