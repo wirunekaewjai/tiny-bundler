@@ -1,0 +1,34 @@
+{
+    "deno.enable": false,
+    "files.associations": {
+        "*.css": "tailwindcss",
+    },
+    "typescript.format.semicolons": "insert",
+    "typescript.preferences.importModuleSpecifier": "non-relative",
+    "typescript.preferences.quoteStyle": "double",
+    "[tailwindcss]": {
+        "editor.tabSize": 2,
+    },
+    "[html]": {
+        "editor.defaultFormatter": "vscode.html-language-features",
+        "editor.tabSize": 2,
+    },
+    "[json]": {
+        "editor.tabSize": 2,
+    },
+    "[jsonc]": {
+        "editor.tabSize": 2,
+    },
+    "[javascript]": {
+        "editor.defaultFormatter": "vscode.typescript-language-features",
+        "editor.formatOnSave": true,
+        "editor.insertSpaces": true,
+        "editor.tabSize": 2,
+    },
+    "[typescript]": {
+        "editor.defaultFormatter": "vscode.typescript-language-features",
+        "editor.formatOnSave": true,
+        "editor.insertSpaces": true,
+        "editor.tabSize": 2,
+    },
+}
