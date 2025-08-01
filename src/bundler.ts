@@ -56,10 +56,12 @@ const frontendSrcDir = config.frontend.srcDir;
 const tempDir = config.bundle.temp ?? "temp";
 
 const isAutoReload = !!config.backend && command === "dev";
+const resourceRegex = new RegExp(`["']([^"'*]+)["']`, "g");
 
-const frontendAlias = { find: config.frontend.alias, replacement: path.join(cwd, frontendSrcDir) };
-
-const resourceRegex = new RegExp(`["'](${frontendAlias.find}/[^"'*]+)["']`, "g");
+const frontendAlias = {
+  find: config.frontend.alias,
+  replacement: path.join(cwd, frontendSrcDir),
+};
 
 const prettierOptions: prettier.Options = {
   parser: "html",
@@ -73,20 +75,20 @@ function color(color: Bun.ColorInput, message: string) {
 }
 
 async function bundle() {
-  function resolveAlias(input: string): [string, string | undefined] | null {
-    try {
-      const [alias, querystring] = input.split("?");
+  function resolvePath(input: string): [string, string | undefined] | null {
+    const [resourcePath, querystring] = input.split("?") as [string, string | undefined];
+    const filePath = path.join(cwd, resourcePath);
 
-      if (alias?.startsWith(frontendAlias.find + "/")) {
-        const resolved = path.join(frontendAlias.replacement, alias.slice(frontendAlias.find.length));
+    if (existsSync(filePath)) {
+      return [filePath, querystring];
+    }
 
-        if (existsSync(resolved)) {
-          return [resolved, querystring];
-        }
+    if (resourcePath?.startsWith(frontendAlias.find + "/")) {
+      const resolvedPath = path.join(frontendAlias.replacement, resourcePath.slice(frontendAlias.find.length));
+
+      if (existsSync(resolvedPath)) {
+        return [resolvedPath, querystring];
       }
-
-    } catch {
-
     }
 
     return null;
@@ -151,7 +153,7 @@ async function bundle() {
         continue;
       }
 
-      const resourcePathAndQuery = resolveAlias(resourceAlias);
+      const resourcePathAndQuery = resolvePath(resourceAlias);
 
       if (resourcePathAndQuery) {
         await processFile(replacers, resourceAlias, resourcePathAndQuery);
@@ -160,8 +162,8 @@ async function bundle() {
 
     let output = code;
 
-    for (const [alias, filePath] of replacers) {
-      output = output.replaceAll(alias, filePath);
+    for (const [resourcePathAndQuery, filePath] of replacers) {
+      output = output.replaceAll(resourcePathAndQuery, filePath);
     }
 
     return output;
@@ -239,7 +241,7 @@ async function bundle() {
                   continue;
                 }
 
-                const resourcePathAndQuery = resolveAlias(resourceAlias);
+                const resourcePathAndQuery = resolvePath(resourceAlias);
 
                 if (resourcePathAndQuery) {
                   await processFile(replacers, resourceAlias, resourcePathAndQuery);
@@ -248,8 +250,8 @@ async function bundle() {
 
               let output = code;
 
-              for (const [alias, filePath] of replacers) {
-                output = output.replaceAll(alias, filePath);
+              for (const [resourcePathAndQuery, filePath] of replacers) {
+                output = output.replaceAll(resourcePathAndQuery, filePath);
               }
 
               return {
@@ -319,12 +321,12 @@ async function bundle() {
 
   rmSync(path.join(cwd, bundleDir), { force: true, recursive: true });
 
-  const version = Date.now();
-
   const rawHTMLs = new Map<string, string>();
   const rawScripts = new Map<string, string>();
 
   const replacers = new Map<string, string>();
+
+  const version = Date.now();
 
   for (const name of new Bun.Glob(`${config.frontend.templates}/**/*`).scanSync({ cwd: path.join(cwd, frontendSrcDir) })) {
     const moduleExt = path.extname(name);
@@ -350,7 +352,7 @@ async function bundle() {
 
     for (const match of html.matchAll(resourceRegex)) {
       const resourceAlias = match[1] ?? "";
-      const resourcePathAndQuery = resolveAlias(resourceAlias);
+      const resourcePathAndQuery = resolvePath(resourceAlias);
 
       if (!resourcePathAndQuery) {
         continue;
@@ -407,8 +409,8 @@ async function bundle() {
   for (const [name, html] of rawHTMLs) {
     let output = html;
 
-    for (const [alias, filePath] of replacers) {
-      output = output.replaceAll(alias, filePath);
+    for (const [resourcePathAndQuery, filePath] of replacers) {
+      output = output.replaceAll(resourcePathAndQuery, filePath);
     }
 
     if (inlines.length) {

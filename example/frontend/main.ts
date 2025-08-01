@@ -11,6 +11,6 @@ const text = html`
 console.log("[MAIN]", text);
 
 document.addEventListener("DOMContentLoaded", () => {
-  const worker = new Worker("@/worker.ts?worker");
+  const worker = new Worker("/frontend/worker.ts?worker");
   worker.postMessage("Hi");
 });
