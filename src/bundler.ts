@@ -303,7 +303,7 @@ async function bundle() {
     return byteLength + " bytes";
   }
 
-  function getColor(filePath: string) {
+  function guessColor(filePath: string) {
     const ext = path.extname(filePath).toLowerCase();
 
     switch (ext) {
@@ -446,7 +446,7 @@ async function bundle() {
     const data = await Bun.file(path.join(root, name)).arrayBuffer();
     const dataSize = `(${formatFileSize(data.byteLength)})`;
 
-    console.log(color(getColor(name), `> ${name.padEnd(maxLength, " ")} ${dataSize}`));
+    console.log(color(guessColor(name), `> ${name.padEnd(maxLength, " ")} ${dataSize}`));
   }
 
   console.log(color("cornflowerblue", `===== bundle end: (${value} ${unit}) =====`));
