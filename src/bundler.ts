@@ -337,6 +337,10 @@ async function bundle() {
       entrypoints: [modulePath],
       packages: "bundle",
       target: "bun",
+      banner: `
+        import { GlobalRegistrator } from "@happy-dom/global-registrator";
+        GlobalRegistrator.register();
+      `,
     });
 
     const moduleBuildOutput = moduleBuild.outputs[0];
