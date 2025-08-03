@@ -335,7 +335,8 @@ async function bundle() {
     const modulePath = path.join(cwd, frontendSrcDir, name);
     const moduleBuild = await Bun.build({
       entrypoints: [modulePath],
-      packages: 'bundle',
+      packages: "bundle",
+      target: "bun",
     });
 
     const moduleBuildOutput = moduleBuild.outputs[0];
