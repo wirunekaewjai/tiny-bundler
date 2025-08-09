@@ -398,7 +398,11 @@ async function bundle() {
       }
     }
 
-    rawHTMLs.set(name, html);
+    const unescapedContent = html.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => {
+      return String.fromCharCode(parseInt(hex, 16));
+    });
+
+    rawHTMLs.set(name, unescapedContent);
   }
 
   if (rawScripts.size > 0) {
