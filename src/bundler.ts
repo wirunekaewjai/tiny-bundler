@@ -339,7 +339,12 @@ async function bundle() {
       target: "bun",
       banner: `
         import { GlobalRegistrator } from "@happy-dom/global-registrator";
-        GlobalRegistrator.register();
+        
+        try {
+          GlobalRegistrator.register();
+        } catch {
+          // do nothing...
+        }
       `,
     });
 
