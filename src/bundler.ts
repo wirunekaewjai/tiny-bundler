@@ -619,6 +619,12 @@ async function dev() {
           webServer = Bun.spawn({
             cmd: isProduction ? command.preview : command.dev,
             stdout: "inherit",
+            stderr: "inherit",
+            onExit(_subprocess, exitCode, _signalCode, _error) {
+              if (typeof exitCode === "number" && exitCode > 0) {
+                autoReloadController?.abort();
+              }
+            },
           });
         }
 
