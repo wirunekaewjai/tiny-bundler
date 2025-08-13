@@ -71,7 +71,7 @@ const prettierOptions: prettier.Options = {
 };
 
 function color(color: Bun.ColorInput, message: string) {
-  return `${Bun.color(color, "ansi-16m")}${message}${Bun.color("lightgrey", "ansi-16m")}`;
+  return `${Bun.color(color, "ansi")}${message}${Bun.color("lightgrey", "ansi")}`;
 }
 
 async function bundle() {
